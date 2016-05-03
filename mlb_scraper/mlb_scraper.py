@@ -10,6 +10,8 @@ class MlbScraper(object):
     
     def __init__(self):
         '''Constructs an mlbscraper object.'''
+
+        self.scrapeTarget = "http://www.cbssports.com/mlb/scoreboard"
         
         self.validTeams = []
         self.validTeams.append("ARI")
@@ -146,17 +148,52 @@ class MlbScraper(object):
 
         '''
 
+        if type(team) is not str:
+            raise TypeError("Team name must be a string.")
+
         if date is None:
             date = datetime.date.today()
+
+        team = team.upper()
+
         
         # Future proof: 3ORLESS. If new nick-name pops up that is 3
         # letters or less, make changes wherever 3ORLESS tag appears
         # in comments.
-        if(len(team) > 3 or team.upper() == "AS" or team.upper() == "A'S"):
+        if(len(team) > 3 or team == "AS" or team == "A'S"):
+            if(team in self.teamNames):
+                team = self.teamNames[team]
+            else:
+                raise ValueError("Team " + team + " is invalid.")
+        elif team not in self.validTeams:
+            raise ValueError("Team " + team + " is invalid.")
 
-            game = {}
-            game["away"] = {}
-            game["home"] = {}
+        # cbs sports uses the convention MLBSTL, MLBNYY, etc.
+        team = "MLB" + team
+        
+        game = {}
+        game["status"] = "none"
+
+        html = urlopen(self.scrapeTarget).read()
+        soup = BeautifulSoup(html, "lxml")
+        foundRows = soup.findAll("tr", class_ = team)
+        
+        # Determine status of the current game.
+        for row in foundRows:
+            tag = row.parent
+            if "liveEvent" in tag["class"]:
+                game["status"] = "live"
+            if "preEvent" in tag["class"]:
+                game["status"] = "pre"
+            if "postEvent" in tag["class"]:
+                game["status"] = "post"
+
+        # Couldn't find game on site. Must be no game today.
+        if game["status"] == "none":
+            return game
+
+        game["away"] = {}
+        game["home"] = {}
 
         awayTeam = tag.find("tr", class_ = "awayTeam")
         awayName = awayTeam["class"][2][3:]
@@ -166,10 +203,10 @@ class MlbScraper(object):
 
         game["away"]["name"] = awayName
         game["home"]["name"] = homeName
-
-
-        if "preEvent" in tag["class"]:
-            game["startTime"] = tag.find("span", class_ = "gmtTime").string
+        
+        if game["status"] == "pre":
+            game["startTimeGmt"] = tag.find("span", class_ = "gmtTime").string
+            return game
         else:
             awayScoreByInning = awayTeam.findAll("td", class_ = "periodScore")
             homeScoreByInning = homeTeam.findAll("td", class_ = "periodScore")
@@ -181,6 +218,10 @@ class MlbScraper(object):
             for index, score in enumerate(homeScoreByInning):
                 homeScoreByInning[index] = score.string
 
+            # Note: Unfortunately, scoreByInning arrays are 0-indexed,
+            # so to get the 7th inning score one would have to do
+            # scoreByInning[6]. We could make index 0 empty, but that
+            # would make it harder to iterate over.
             game["away"]["scoreByInning"] = awayScoreByInning
             game["home"]["scoreByInning"] = homeScoreByInning
 
@@ -201,6 +242,21 @@ class MlbScraper(object):
 
             game["away"]["errors"] = awayErrors
             game["home"]["errors"] = homeErrors
+
+            # NOTE: Check during live games to see how we can
+            # determine what inning it is currently in, where runners
+            # are, how many balls, strikes, and outs there are.
+
+            # TODO: See what happens during the following situations,
+            # and implement support for them:
+            # Delay (rain)
+            # Cancellation
+            # Double-header
+            
+            # TODO: Consider the following additions: See who is
+            # hitting, pitching. On client side, we could have
+            # database of images to put into a graphic based on the
+            # current hitter and pitcher.
 
         return game
 
