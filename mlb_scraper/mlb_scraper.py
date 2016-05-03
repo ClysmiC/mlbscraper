@@ -123,6 +123,9 @@ class MlbScraper(object):
             raise TypeError("Team name must be a string.")
 
         teamName = teamName.upper()
+
+        if teamName in self.validTeams:
+            return teamName
         
         if teamName not in self.teamNames:
             return None
