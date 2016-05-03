@@ -11,7 +11,7 @@ class MlbScraper(object):
     def __init__(self):
         '''Constructs an mlbscraper object.'''
 
-        self.scrapeTarget = "http://www.cbssports.com/mlb/scoreboard"
+        self.scrapeTarget = "http://www.cbssports.com/mlb/scoreboard/"
         
         self.validTeams = []
         self.validTeams.append("ARI")
@@ -151,9 +151,6 @@ class MlbScraper(object):
         if type(team) is not str:
             raise TypeError("Team name must be a string.")
 
-        if date is None:
-            date = datetime.date.today()
-
         team = team.upper()
 
         
@@ -171,12 +168,27 @@ class MlbScraper(object):
         # cbs sports uses the convention MLBSTL, MLBNYY, etc.
         team = "MLB" + team
         
-        game = {}
-        game["status"] = "none"
-
-        html = urlopen(self.scrapeTarget).read()
+        if date is None:
+            date = datetime.date.today()
+            
+        dateString = str(date.year).zfill(4) + str(date.month).zfill(2) + str(date.day).zfill(2)
+        
+        ##
+        ## OPEN AND BEGIN URL PARSE
+        ##
+        ##
+        html = urlopen(self.scrapeTarget + dateString)
+        
         soup = BeautifulSoup(html, "lxml")
         foundRows = soup.findAll("tr", class_ = team)
+
+
+        ##
+        ## EXTRACT GAME INFO FROM HTML
+        ##
+        ##
+        game = {}
+        game["status"] = "none"
         
         # Determine status of the current game.
         for row in foundRows:
@@ -205,13 +217,25 @@ class MlbScraper(object):
         game["home"]["name"] = homeName
         
         if game["status"] == "pre":
-            game["startTimeGmt"] = tag.find("span", class_ = "gmtTime").string
+            # Note: CBS has a div called gmtTime that instantly gets
+            # updated by javascript to be called gmtTimeUpdated. I
+            # assume this is after checking my local timezone and
+            # changing the contents of the div. However, even before
+            # it updates, it has correctly had the EDT timezone in
+            # this div for me. I don't know if this is just a default,
+            # or if it is something done server-side. Look into
+            # this... I would prefer to get the actual GMT time so any
+            # application using this module can do the converting
+            # themself. Do more investigation once I get out to
+            # Seattle, as spoofing into a different timezone by
+            # changing OS settings has not had an effect.
+            game["startTime"] = tag.find("span", class_ = "gmtTime").string
             return game
         else:
             awayScoreByInning = awayTeam.findAll("td", class_ = "periodScore")
             homeScoreByInning = homeTeam.findAll("td", class_ = "periodScore")
 
-            #save the inner string of all the periodScore td's
+            # Save the inner string of all the periodScore td's
             for index, score in enumerate(awayScoreByInning):
                 awayScoreByInning[index] = score.string
 
