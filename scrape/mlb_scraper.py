@@ -11,8 +11,6 @@ class BaseMlbScraper(metaclass=ABCMeta):
     
     def __init__(self):
         '''Constructs an mlbscraper object.'''
-
-        self.scrapeTarget = "http://www.cbssports.com/mlb/scoreboard/"
         
         self.validTeams = []
         self.validTeams.append("ARI")

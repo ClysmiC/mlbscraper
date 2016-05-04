@@ -2,6 +2,7 @@ import sys
 import datetime
 
 from scrape.mlb_scraper import GameStatus, InningPart
+from scrape.mlb_scraper_mlb_api import MlbScraperMlbApi
 from scrape.mlb_scraper_cbs import MlbScraperCbs
 
 mlb = MlbScraperCbs()
@@ -106,15 +107,15 @@ else:
         
     awayString += game["away"]["name"] + (" " * (3 - len(game["away"]["name"])))
     for inningScore in game["away"]["scoreByInning"]:
-        awayString += (" " * (5 - len(str(inningScore)))) + inningScore
+        awayString += (" " * (5 - len(inningScore))) + inningScore
         
     awayString += " |" + (" " * (3 - len(game["away"]["runs"]))) + game["away"]["runs"]
     awayString += " |" + (" " * (3 - len(game["away"]["hits"]))) + game["away"]["hits"]
     awayString += " |" + (" " * (3 - len(game["away"]["errors"]))) + game["away"]["errors"]
         
-    homeString += game["home"]["name"]
+    homeString += game["home"]["name"] + (" " * (3 - len(game["home"]["name"])))
     for inningScore in game["home"]["scoreByInning"]:
-        homeString += (" " * (5 - len(str(inningScore)))) + inningScore
+        homeString += (" " * (5 - len(inningScore))) + inningScore
             
     homeString += " |" + (" " * (3 - len(game["home"]["runs"]))) + game["home"]["runs"]
     homeString += " |" + (" " * (3 - len(game["home"]["hits"]))) + game["home"]["hits"]
