@@ -85,11 +85,11 @@ class MlbScraperMlbApi(BaseMlbScraper):
                 # TODO: check the api when there are rainouts or rain
                 # delays. I suspect that these are shown in this
                 # status attribute.
-                if statusString == "Preview":
+                if statusString in ("Warmup", "Preview"):
                     game["status"] = GameStatus.Pre
                 elif statusString == "In Progress":
                     game["status"] = GameStatus.Live
-                elif statusString == "Final":
+                elif statusString in ("Final", "Game Over"):
                     game["status"] = GameStatus.Post
                 else:
                     raise Exception("Unknown status string: " + statusString)
@@ -115,17 +115,7 @@ class MlbScraperMlbApi(BaseMlbScraper):
                 
                 if game["status"] == GameStatus.Live:
 
-                    game["situation"] = {}
-                    
-                    # If you want first + last name, use a string like this:
-                    # gameData["pitcher"]["first"] + " " + gameData["pitcher"]["last"]
-                    game["situation"]["pitcher"] = gameData["pitcher"]["name_display_roster"]
-                    game["situation"]["batter"] = gameData["batter"]["name_display_roster"]
-                    
-                    game["situation"]["balls"]   = gameData["status"]["b"]
-                    game["situation"]["strikes"] = gameData["status"]["s"]
-                    game["situation"]["outs"]    = gameData["status"]["o"]
-
+                    # Determine inning, and part of inning
                     game["inning"] = {}
                     game["inning"]["number"] = gameData["status"]["inning"]
 
@@ -144,6 +134,58 @@ class MlbScraperMlbApi(BaseMlbScraper):
                             game["inning"]["part"] = InningPart.End
                         else:
                             game["inning"]["part"] = InningPart.Bot
+
+                            
+                    game["situation"] = {}
+
+                    # Store baserunner names in list. Empty string
+                    # means no runner on.
+                    game["situation"]["runners"] = []
+
+                    # Mlb leaves "dangling" data between innings
+                    # (Mid/End), such as the b/s/o count, and who is
+                    # batting/pitching, which doesn't get updated
+                    # until the next inning starts (is in the
+                    # Top/Bot). Between innings, I want b/s/o set to
+                    # 0, and I want the batter to be the "due up"
+                    # batter for the upcoming inning.
+                    if game["inning"]["part"] in (InningPart.Top, InningPart.Bot):
+                        # If you want first + last name, use a string like this:
+                        # gameData["pitcher"]["first"] + " " + gameData["pitcher"]["last"]
+                        game["situation"]["pitcher"] = gameData["pitcher"]["name_display_roster"]
+                        game["situation"]["batter"] = gameData["batter"]["name_display_roster"]
+
+                        game["situation"]["balls"]   = gameData["status"]["b"]
+                        game["situation"]["strikes"] = gameData["status"]["s"]
+                        game["situation"]["outs"]    = gameData["status"]["o"]
+
+                        if "runner_on_1b" in gameData["runners_on_base"]:
+                            game["situation"]["runners"].append(gameData["runners_on_base"]["runner_on_1b"]["name_display_roster"])
+                        else:
+                            game["situation"]["runners"].append("")
+
+                        if "runner_on_2b" in gameData["runners_on_base"]:
+                            game["situation"]["runners"].append(gameData["runners_on_base"]["runner_on_2b"]["name_display_roster"])
+                        else:
+                            game["situation"]["runners"].append("")
+
+                        if "runner_on_3b" in gameData["runners_on_base"]:
+                            game["situation"]["runners"].append(gameData["runners_on_base"]["runner_on_3b"]["name_display_roster"])
+                        else:
+                            game["situation"]["runners"].append("")
+
+                    # Inning is in Mid/End, peek ahead and put that
+                    # data as the situation
+                    else:
+                        game["situation"]["pitcher"] = gameData["opposing_pitcher"]["name_display_roster"]
+                        game["situation"]["batter"] = gameData["due_up_batter"]["name_display_roster"]
+                        game["situation"]["balls"]   = "0"
+                        game["situation"]["strikes"] = "0"
+                        game["situation"]["outs"]    = "0"
+                        game["situation"]["runners"].append("")
+                        game["situation"]["runners"].append("")
+                        game["situation"]["runners"].append("")
+
                     
 
                 # Add pitcher information for finished games.  This
@@ -182,8 +224,21 @@ class MlbScraperMlbApi(BaseMlbScraper):
 
                     awayScoreByInning = []
                     homeScoreByInning = []
+
+                    # If in first inning, linescore->inning directly
+                    # describes first inning.  Otherwise
+                    # linescore->inning is an array, with each entry
+                    # describing an inning. Dumb... but I need to work
+                    # around it.
+                    if type(gameData["linescore"]["inning"] is list):
+                        inningArray = gameData["linescore"]["inning"]
+                    elif type(gameData["linescore"]["inning"] is dict):
+                        inningArray = []
+                        inningArray.append(gameData["linescore"]["inning"])
+                    else:
+                        raise Exception('''Unexpected type of game["linescore"]["inning"]: ''' + str(type(gameData["linescore"]["inning"])))
                     
-                    for inning in gameData["linescore"]["inning"]:
+                    for inning in inningArray:
                         # Inning is live-- I (think) string is only
                         # empty during live inning with no runs
                         # yet. So let's just insert 0.
@@ -201,8 +256,7 @@ class MlbScraperMlbApi(BaseMlbScraper):
                         elif game["status"] == GameStatus.Post:
                             # Should only occur in inning 9 or beyond
                             homeScoreByInning.append("X")
-                        else:
-                            raise Exception("Home missing inning, but status is not Post")
+                            # Else we leave blank, and autofill in with - below
 
                     # Pad unplayed innings with dashes
                     while len(awayScoreByInning) < 9:
@@ -224,7 +278,7 @@ class MlbScraperMlbApi(BaseMlbScraper):
                 # _not_ break out of the loop and figure out which
                 # game(s) are active, and which to display ?
                 break
-            
+
         return game
 
 

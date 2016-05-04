@@ -82,7 +82,11 @@ if(game["status"] == GameStatus.NoGame):
 elif(game["status"] == GameStatus.Pre):
     print(game["away"]["name"] + " vs. " + game["home"]["name"])
     print("Game Time: " + game["startTime"])
-    
+    print("")
+    print("Probable Starters")
+    print(game["away"]["name"] + ": " + game["away"]["starter"]["name"] + " ({:s}-{:s}, {:s})".format(game["away"]["starter"]["wins"], game["away"]["starter"]["losses"], game["away"]["starter"]["era"]))
+    print(game["home"]["name"] + ": " + game["home"]["starter"]["name"] + " ({:s}-{:s}, {:s})".format(game["home"]["starter"]["wins"], game["home"]["starter"]["losses"], game["home"]["starter"]["era"]))
+                
 else:
     if(game["status"] == GameStatus.Live):
         print("--" + game["inning"]["part"].name + " " + game["inning"]["number"] + "--")
@@ -140,16 +144,42 @@ else:
     homeString += " |" + (" " * (3 - len(game["home"]["runs"]))) + game["home"]["runs"]
     homeString += " |" + (" " * (3 - len(game["home"]["hits"]))) + game["home"]["hits"]
     homeString += " |" + (" " * (3 - len(game["home"]["errors"]))) + game["home"]["errors"]
-
+    
+    print(awayString)
+    print(homeString)
+    
     if game["status"] == GameStatus.Live:
         # Example situation output
         #
-        # B: ***         ?
-        # S: *         *   *  
-        # O: **          ?            
+        # B: ***         o          P: Wacha
+        # S: *         *   *       AB: Cruz
+        # O: **          o            
+        
+        numBalls = int(game["situation"]["balls"])
+        numStrikes = int(game["situation"]["strikes"])
+        numOuts = int(game["situation"]["outs"])
+        runners = game["situation"]["runners"]
+        
+        string1 = "B: " + ("*" * numBalls) + (" " * (10 - numBalls))
+        string1 += "  "
+        string1 += ("o" if runners[1] == "" else "*")
+        string1 += "          P: " + game["situation"]["pitcher"]
+        
 
-    print(awayString)
-    print(homeString)
+        string2 = "S: " + ("*" * numStrikes) + (" " * (10 - numStrikes))
+        string2 += ("o" if runners[2] == "" else "*")
+        string2 += "   "
+        string2 += ("o" if runners[0] == "" else "*")
+        string2 += "       AB: " + game["situation"]["batter"]
+
+        string3 = "O: " + ("*" * numOuts) + (" " * (10 - numOuts))
+        string3 += "  "
+        string3 += "o"
+        
+        print("")
+        print(string1)
+        print(string2)
+        print(string3)
 
 
     
