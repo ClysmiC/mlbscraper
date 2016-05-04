@@ -4,7 +4,7 @@ from scrape.mlb_scraper_cbs import MlbScraperCbs
 
 mlb = MlbScraperMlbApi()
 
-standings = mlb.getDivisionStandings("ALE");
+standings = mlb.getDivisionStandings(input("Enter division: "));
 
 # Example table with garbage data
 #  _____________________________

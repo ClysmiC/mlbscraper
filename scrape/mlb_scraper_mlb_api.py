@@ -123,7 +123,7 @@ class MlbScraperMlbApi(BaseMlbScraper):
                     # If you want first + last name, use a string like this:
                     # gameData["pitcher"]["first"] + " " + gameData["pitcher"]["last"]
                     game["situation"]["pitcher"] = gameData["pitcher"]["name_display_roster"]
-                    game["satuation"]["batter"] = gameData["batter"]["name_display_roster"]
+                    game["situation"]["batter"] = gameData["batter"]["name_display_roster"]
                     
                     game["situation"]["balls"]   = gameData["status"]["b"]
                     game["situation"]["strikes"] = gameData["status"]["s"]
