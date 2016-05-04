@@ -1,8 +1,8 @@
-from mlb_scraper.mlb_scraper import MlbScraper
+from scrapers.mlb_scraper_cbs import MlbScraperCbs, GameStatus, InningPart
 import sys
 import datetime
 
-mlb = MlbScraper()
+mlb = MlbScraperCbs()
 
 argError = False
 date = None
@@ -73,25 +73,36 @@ except Exception as e:
 
 print("")
 
-if(game["status"] == "none"):
+if(game["status"] == GameStatus.NoGame):
     print("No game today.")
     
-elif(game["status"] == "pre"):
+elif(game["status"] == GameStatus.Pre):
     print(game["away"]["name"] + " vs. " + game["home"]["name"])
     print("Game Time: " + game["startTime"])
     
 else:
-    if(game["status"] == "post"):
+    if(game["status"] == GameStatus.Post):
         print("-FINAL-")
         print(game["away"]["name"] + ": " + game["away"]["runs"])
         print(game["home"]["name"] + ": " + game["home"]["runs"])
 
     # TODO: Implement support for games in extra innings.
     print("")
-    print("       1    2    3    4    5    6    7    8    9    R    H    E")
-    print("---------------------------------------------------------------")
-    
-    awayString = game["away"]["name"] + (" " * (3 - len(game["away"]["name"])))
+    print("          1    2    3    4    5    6    7    8    9    R    H    E")
+    print("------------------------------------------------------------------")
+
+    if game["status"] == GameStatus.Live:
+        if game["inning"]["part"] in (InningPart.Top, InningPart.End):
+            awayString = " * "
+            homeString = "   "
+        else:
+            awayString = "   "
+            homeString = " * "
+    else:
+        awayString = "   "
+        homeString = "   "
+        
+    awayString += game["away"]["name"] + (" " * (3 - len(game["away"]["name"])))
     for inningScore in game["away"]["scoreByInning"]:
         awayString += (" " * (5 - len(str(inningScore)))) + inningScore
         
@@ -99,7 +110,7 @@ else:
     awayString += " |" + (" " * (3 - len(game["away"]["hits"]))) + game["away"]["hits"]
     awayString += " |" + (" " * (3 - len(game["away"]["errors"]))) + game["away"]["errors"]
         
-    homeString = game["home"]["name"]
+    homeString += game["home"]["name"]
     for inningScore in game["home"]["scoreByInning"]:
         homeString += (" " * (5 - len(str(inningScore)))) + inningScore
             
