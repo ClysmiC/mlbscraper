@@ -1,6 +1,8 @@
-from scrapers.mlb_scraper_cbs import MlbScraperCbs, GameStatus, InningPart
 import sys
 import datetime
+
+from scrape.mlb_scraper import GameStatus, InningPart
+from scrape.mlb_scraper_cbs import MlbScraperCbs
 
 mlb = MlbScraperCbs()
 
