@@ -94,10 +94,7 @@ class MlbScraperMlbApi(BaseMlbScraper):
                 else:
                     raise Exception("Unknown status string: " + statusString)
                 
-                # TODO: Handle pre-game. Return following extra info:
-                #
-                # Start time
-                # Starting Pitchers + Records
+
                 if game["status"] == GameStatus.Pre:
                     game["startTime"] = gameData["time"]
 
@@ -165,7 +162,7 @@ class MlbScraperMlbApi(BaseMlbScraper):
                     game["pitcherResults"]["loss"]["name"] = gameData["losing_pitcher"]["name_display_roster"]
                     game["pitcherResults"]["loss"]["updatedWins"] = gameData["losing_pitcher"]["wins"]
                     game["pitcherResults"]["loss"]["updatedLosses"] = gameData["losing_pitcher"]["losses"]                    
-                    if gameData["savePitcher"]["name_display_roster"] != "":
+                    if gameData["save_pitcher"]["name_display_roster"] != "":
                         game["pitcherResults"]["save"] = {}
                         game["pitcherResults"]["save"]["name"] = gameData["save_pitcher"]["name_display_roster"]
                         game["pitcherResults"]["save"]["updatedSaves"] = gameData["save_pitcher"]["saves"]
@@ -187,13 +184,25 @@ class MlbScraperMlbApi(BaseMlbScraper):
                     homeScoreByInning = []
                     
                     for inning in gameData["linescore"]["inning"]:
-                        awayScoreByInning.append(inning["away"])
+                        # Inning is live-- I (think) string is only
+                        # empty during live inning with no runs
+                        # yet. So let's just insert 0.
+                        if inning["away"] == "":
+                            awayScoreByInning.append("0")
+                        else:
+                            awayScoreByInning.append(inning["away"])
 
                         if "home" in inning:
-                            homeScoreByInning.append(inning["home"])
+                            if inning["home"] == "":
+                                homeScoreByInning.append("0")
+                            else:
+                                homeScoreByInning.append(inning["home"])
+                                
                         elif game["status"] == GameStatus.Post:
                             # Should only occur in inning 9 or beyond
                             homeScoreByInning.append("X")
+                        else:
+                            raise Exception("Home missing inning, but status is not Post")
 
                     # Pad unplayed innings with dashes
                     while len(awayScoreByInning) < 9:

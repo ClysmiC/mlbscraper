@@ -84,15 +84,35 @@ elif(game["status"] == GameStatus.Pre):
     print("Game Time: " + game["startTime"])
     
 else:
+    if(game["status"] == GameStatus.Live):
+        print("--" + game["inning"]["part"].name + " " + game["inning"]["number"] + "--")
     if(game["status"] == GameStatus.Post):
-        print("-FINAL-")
-        print(game["away"]["name"] + ": " + game["away"]["runs"])
-        print(game["home"]["name"] + ": " + game["home"]["runs"])
+        print("--FINAL--")
 
-    # TODO: Implement support for games in extra innings.
+    print(game["away"]["name"] + ": " + game["away"]["runs"])
+    print(game["home"]["name"] + ": " + game["home"]["runs"])
+
+    if(game["status"] == GameStatus.Post):
+        print("")
+        print("W: " + game["pitcherResults"]["win"]["name"] + " ({:s}-{:s})".format(game["pitcherResults"]["win"]["updatedWins"], game["pitcherResults"]["win"]["updatedLosses"]))
+
+        print("L: " + game["pitcherResults"]["loss"]["name"] + " ({:s}-{:s})".format(game["pitcherResults"]["loss"]["updatedWins"], game["pitcherResults"]["loss"]["updatedLosses"]))
+
+        if("save" in game["pitcherResults"]):
+            print("S: " + game["pitcherResults"]["save"]["name"] + " ({:s})".format(game["pitcherResults"]["save"]["updatedSaves"]))
+        
     print("")
-    print("          1    2    3    4    5    6    7    8    9    R    H    E")
-    print("------------------------------------------------------------------")
+    inningString    = "         "
+    underlineString = "---------------------"
+
+    for i in range(1, max(10, len(game["away"]["scoreByInning"]) + 1)):
+        inningString += "{:2d}".format(i) + "   "
+        underlineString += "-----"
+
+    inningString += " R    H    E"
+
+    print(inningString)
+    print(underlineString)
 
     if game["status"] == GameStatus.Live:
         if game["inning"]["part"] in (InningPart.Top, InningPart.End):
@@ -121,6 +141,15 @@ else:
     homeString += " |" + (" " * (3 - len(game["home"]["hits"]))) + game["home"]["hits"]
     homeString += " |" + (" " * (3 - len(game["home"]["errors"]))) + game["home"]["errors"]
 
+    if game["status"] == GameStatus.Live:
+        # Example situation output
+        #
+        # B: ***         ?
+        # S: *         *   *  
+        # O: **          ?            
+
     print(awayString)
     print(homeString)
 
+
+    
