@@ -15,39 +15,7 @@ class MlbScraperMlbApi(BaseMlbScraper):
         # loads the info just fine though
         self.standingsScrapeTarget = "http://espn.go.com/mlb/standings"
         self.wildcardStandingsScrapeTarget = "http://espn.go.com/mlb/standings/_/view/wild-card"
-        
-        self.mlbApiTeamNames = {}
-        self.mlbApiTeamNames["ARI"] = "D-backs"
-        self.mlbApiTeamNames["ATL"] = "Braves"
-        self.mlbApiTeamNames["BAL"] = "Orioles"
-        self.mlbApiTeamNames["BOS"] = "Red Sox"
-        self.mlbApiTeamNames["CHC"] = "Cubs"
-        self.mlbApiTeamNames["CHW"] = "White Sox"
-        self.mlbApiTeamNames["CIN"] = "Reds"
-        self.mlbApiTeamNames["CLE"] = "Indians"
-        self.mlbApiTeamNames["COL"] = "Rockies"
-        self.mlbApiTeamNames["DET"] = "Tigers"
-        self.mlbApiTeamNames["HOU"] = "Astros"
-        self.mlbApiTeamNames["KC"]  = "Royals"
-        self.mlbApiTeamNames["LAA"] = "Angels"
-        self.mlbApiTeamNames["LAD"] = "Dodgers"
-        self.mlbApiTeamNames["MIA"] = "Marlins"
-        self.mlbApiTeamNames["MIL"] = "Brewers"
-        self.mlbApiTeamNames["MIN"] = "Twins"
-        self.mlbApiTeamNames["NYM"] = "Mets"
-        self.mlbApiTeamNames["NYY"] = "Yankees"
-        self.mlbApiTeamNames["OAK"] = "Athletics"
-        self.mlbApiTeamNames["PHI"] = "Phillies"
-        self.mlbApiTeamNames["PIT"] = "Pirates"
-        self.mlbApiTeamNames["SD"]  = "Padres"
-        self.mlbApiTeamNames["SEA"] = "Mariners"
-        self.mlbApiTeamNames["SF"]  = "Giants"
-        self.mlbApiTeamNames["STL"] = "Cardinals"
-        self.mlbApiTeamNames["TB"]  = "Rays"
-        self.mlbApiTeamNames["TEX"] = "Rangers"
-        self.mlbApiTeamNames["TOR"] = "Blue Jays"
-        self.mlbApiTeamNames["WAS"] = "Nationals"
-        
+                
         
     def getGameInfo(self, team, date=None):
         if type(team) is not str:
@@ -58,21 +26,23 @@ class MlbScraperMlbApi(BaseMlbScraper):
         if team is None:
             raise ValueError("Invalid team name.")
 
-        team = self.mlbApiTeamNames[team]
-
         if date is None:
             date = datetime.date.today()
 
         dateString = "year_" +  str(date.year).zfill(4) + "/month_" + str(date.month).zfill(2) + "/day_" + str(date.day).zfill(2) + "/master_scoreboard.json"
+
+        try:
+            jsonString = urlopen(self.gameScrapeTarget + dateString).read().decode("utf-8")
+        except:
+            return -1
         
-        jsonString = urlopen(self.gameScrapeTarget + dateString).read().decode("utf-8")
         scoreboard = json.loads(jsonString)
 
         game = {}
         game["status"] = GameStatus.NoGame
         
         for gameData in scoreboard["data"]["games"]["game"]:
-            if gameData["home_team_name"] == team or gameData["away_team_name"] == team:
+            if gameData["home_name_abbrev"] == team or gameData["away_name_abbrev"] == team:
 
                 game["away"] = {}
                 game["home"] = {}
@@ -141,6 +111,8 @@ class MlbScraperMlbApi(BaseMlbScraper):
                     # Store baserunner names in list. Empty string
                     # means no runner on.
                     game["situation"]["runners"] = []
+                    game["situation"]["pitcher"] = {}
+                    game["situation"]["batter"] = {}
 
                     # Mlb leaves "dangling" data between innings
                     # (Mid/End), such as the b/s/o count, and who is
@@ -152,8 +124,12 @@ class MlbScraperMlbApi(BaseMlbScraper):
                     if game["inning"]["part"] in (InningPart.Top, InningPart.Bot):
                         # If you want first + last name, use a string like this:
                         # gameData["pitcher"]["first"] + " " + gameData["pitcher"]["last"]
-                        game["situation"]["pitcher"] = gameData["pitcher"]["name_display_roster"]
-                        game["situation"]["batter"] = gameData["batter"]["name_display_roster"]
+                        
+                        game["situation"]["batter"]["name"] = gameData["batter"]["name_display_roster"]
+                        game["situation"]["batter"]["avg"] = gameData["batter"]["avg"]
+                        
+                        game["situation"]["pitcher"]["name"] = gameData["pitcher"]["name_display_roster"]
+                        game["situation"]["pitcher"]["era"] = gameData["pitcher"]["era"]
 
                         game["situation"]["balls"]   = gameData["status"]["b"]
                         game["situation"]["strikes"] = gameData["status"]["s"]
@@ -174,11 +150,19 @@ class MlbScraperMlbApi(BaseMlbScraper):
                         else:
                             game["situation"]["runners"].append("")
 
+                        if "pbp" in gameData and "last" in gameData["pbp"] and gameData["pbp"]["last"] != "":
+                            game["situation"]["lastPlay"] = gameData["pbp"]["last"]
+
+                            
                     # Inning is in Mid/End, peek ahead and put that
                     # data as the situation
                     else:
-                        game["situation"]["pitcher"] = gameData["opposing_pitcher"]["name_display_roster"]
-                        game["situation"]["batter"] = gameData["due_up_batter"]["name_display_roster"]
+                        game["situation"]["batter"]["name"] = gameData["batter"]["name_display_roster"]
+                        game["situation"]["batter"]["avg"] = gameData["batter"]["avg"]
+                        
+                        game["situation"]["pitcher"]["name"] = gameData["pitcher"]["name_display_roster"]
+                        game["situation"]["pitcher"]["era"] = gameData["pitcher"]["era"]
+                        
                         game["situation"]["balls"]   = "0"
                         game["situation"]["strikes"] = "0"
                         game["situation"]["outs"]    = "0"
@@ -291,7 +275,11 @@ class MlbScraperMlbApi(BaseMlbScraper):
         if team is None:
             raise ValueError("Invalid team name.")
 
-        html = urlopen(self.standingsScrapeTarget)
+        try:
+            html = urlopen(self.standingsScrapeTarget)
+        except:
+            return -1
+        
         soup = BeautifulSoup(html, "lxml")
 
         tags = soup.find("abbr", text=team)
@@ -334,7 +322,11 @@ class MlbScraperMlbApi(BaseMlbScraper):
             else:
                 division = "East"
 
-        html = urlopen(target)
+        try:
+            html = urlopen(target)
+        except:
+            return -1
+        
         soup = BeautifulSoup(html, "lxml")
 
         tableHeader = soup.find(class_="long-caption", text=league).parent
@@ -342,7 +334,6 @@ class MlbScraperMlbApi(BaseMlbScraper):
         divisionHeader = table.find("span", text=division)
 
         divisionHeader = divisionHeader.find_parent(class_="standings-categories")
-
         rowsToGet = (12 if wildCardQuery else 5)
         
         divisionRows = divisionHeader.find_next_siblings(class_="standings-row", limit=rowsToGet)

@@ -1,12 +1,11 @@
 import sys
 import os
 import datetime
+import time
 
 from scrape.mlb_scraper import GameStatus, InningPart
 from scrape.mlb_scraper_mlb_api import MlbScraperMlbApi
 from scrape.mlb_scraper_cbs import MlbScraperCbs
-
-print(sys.path)
 
 mlb = MlbScraperMlbApi()
 
@@ -70,119 +69,125 @@ if date is None:
             print("Invalid date. Exiting...")
             exit()
 
-try:
-    game = mlb.getGameInfo(team, date)
-except Exception as e:
-    print("Error. Perhaps you typed an invalid team name?")
-    raise e # NOTE: only for dev / debugging purposes do we re-raise
-            # error
+while(True):
+    try:
+        game = mlb.getGameInfo(team, date)
+    except Exception as e:
+        print("Error. Perhaps you typed an invalid team name?")
+        raise e # NOTE: only for dev / debugging purposes do we re-raise
+                # error
 
-print("")
-
-if(game["status"] == GameStatus.NoGame):
-    print("No game today.")
-    
-elif(game["status"] == GameStatus.Pre):
-    print(game["away"]["name"] + " vs. " + game["home"]["name"])
-    print("Game Time: " + game["startTime"])
-    print("")
-    print("Probable Starters")
-    print(game["away"]["name"] + ": " + game["away"]["starter"]["name"] + " ({:s}-{:s}, {:s})".format(game["away"]["starter"]["wins"], game["away"]["starter"]["losses"], game["away"]["starter"]["era"]))
-    print(game["home"]["name"] + ": " + game["home"]["starter"]["name"] + " ({:s}-{:s}, {:s})".format(game["home"]["starter"]["wins"], game["home"]["starter"]["losses"], game["home"]["starter"]["era"]))
-                
-else:
-    if(game["status"] == GameStatus.Live):
-        print("--" + game["inning"]["part"].name + " " + game["inning"]["number"] + "--")
-    if(game["status"] == GameStatus.Post):
-        print("--FINAL--")
-
-    print(game["away"]["name"] + ": " + game["away"]["runs"])
-    print(game["home"]["name"] + ": " + game["home"]["runs"])
-
-    if(game["status"] == GameStatus.Post):
-        print("")
-        print("W: " + game["pitcherResults"]["win"]["name"] + " ({:s}-{:s})".format(game["pitcherResults"]["win"]["updatedWins"], game["pitcherResults"]["win"]["updatedLosses"]))
-
-        print("L: " + game["pitcherResults"]["loss"]["name"] + " ({:s}-{:s})".format(game["pitcherResults"]["loss"]["updatedWins"], game["pitcherResults"]["loss"]["updatedLosses"]))
-
-        if("save" in game["pitcherResults"]):
-            print("S: " + game["pitcherResults"]["save"]["name"] + " ({:s})".format(game["pitcherResults"]["save"]["updatedSaves"]))
-        
-    print("")
-    inningString    = "         "
-    underlineString = "---------------------"
-
-    for i in range(1, max(10, len(game["away"]["scoreByInning"]) + 1)):
-        inningString += "{:2d}".format(i) + "   "
-        underlineString += "-----"
-
-    inningString += " R    H    E"
-
-    print(inningString)
-    print(underlineString)
-
-    if game["status"] == GameStatus.Live:
-        if game["inning"]["part"] in (InningPart.Top, InningPart.End):
-            awayString = " * "
-            homeString = "   "
-        else:
-            awayString = "   "
-            homeString = " * "
+    if type(game) is int and game == -1:
+        print("Error opening url. Check internet connection.")
     else:
-        awayString = "   "
-        homeString = "   "
-        
-    awayString += game["away"]["name"] + (" " * (3 - len(game["away"]["name"])))
-    for inningScore in game["away"]["scoreByInning"]:
-        awayString += (" " * (5 - len(inningScore))) + inningScore
-        
-    awayString += " |" + (" " * (3 - len(game["away"]["runs"]))) + game["away"]["runs"]
-    awayString += " |" + (" " * (3 - len(game["away"]["hits"]))) + game["away"]["hits"]
-    awayString += " |" + (" " * (3 - len(game["away"]["errors"]))) + game["away"]["errors"]
-        
-    homeString += game["home"]["name"] + (" " * (3 - len(game["home"]["name"])))
-    for inningScore in game["home"]["scoreByInning"]:
-        homeString += (" " * (5 - len(inningScore))) + inningScore
-            
-    homeString += " |" + (" " * (3 - len(game["home"]["runs"]))) + game["home"]["runs"]
-    homeString += " |" + (" " * (3 - len(game["home"]["hits"]))) + game["home"]["hits"]
-    homeString += " |" + (" " * (3 - len(game["home"]["errors"]))) + game["home"]["errors"]
-    
-    print(awayString)
-    print(homeString)
-    
-    if game["status"] == GameStatus.Live:
-        # Example situation output
-        #
-        # B: ***         o          P: Wacha
-        # S: *         *   *       AB: Cruz
-        # O: **          o            
-        
-        numBalls = int(game["situation"]["balls"])
-        numStrikes = int(game["situation"]["strikes"])
-        numOuts = int(game["situation"]["outs"])
-        runners = game["situation"]["runners"]
-        
-        string1 = "B: " + ("*" * numBalls) + (" " * (10 - numBalls))
-        string1 += "  "
-        string1 += ("o" if runners[1] == "" else "*")
-        string1 += "          P: " + game["situation"]["pitcher"]
-        
-
-        string2 = "S: " + ("*" * numStrikes) + (" " * (10 - numStrikes))
-        string2 += ("o" if runners[2] == "" else "*")
-        string2 += "   "
-        string2 += ("o" if runners[0] == "" else "*")
-        string2 += "       AB: " + game["situation"]["batter"]
-
-        string3 = "O: " + ("*" * numOuts) + (" " * (10 - numOuts))
-        string3 += "  "
-        string3 += "o"
-        
         print("")
-        print(string1)
-        print(string2)
-        print(string3)
+
+        if(game["status"] == GameStatus.NoGame):
+            print("No game today.")
+
+        elif(game["status"] == GameStatus.Pre):
+            print(game["away"]["name"] + " vs. " + game["home"]["name"])
+            print("Game Time: " + game["startTime"])
+            print("")
+            print("Probable Starters")
+            print(game["away"]["name"] + ": " + game["away"]["starter"]["name"] + " ({:s}-{:s}, {:s})".format(game["away"]["starter"]["wins"], game["away"]["starter"]["losses"], game["away"]["starter"]["era"]))
+            print(game["home"]["name"] + ": " + game["home"]["starter"]["name"] + " ({:s}-{:s}, {:s})".format(game["home"]["starter"]["wins"], game["home"]["starter"]["losses"], game["home"]["starter"]["era"]))
+
+        else:
+            if(game["status"] == GameStatus.Live):
+                print("--" + game["inning"]["part"].name + " " + game["inning"]["number"] + "--")
+            if(game["status"] == GameStatus.Post):
+                print("--FINAL--")
+
+            print(game["away"]["name"] + ": " + game["away"]["runs"])
+            print(game["home"]["name"] + ": " + game["home"]["runs"])
+
+            if(game["status"] == GameStatus.Post):
+                print("")
+                print("W: " + game["pitcherResults"]["win"]["name"] + " ({:s}-{:s})".format(game["pitcherResults"]["win"]["updatedWins"], game["pitcherResults"]["win"]["updatedLosses"]))
+
+                print("L: " + game["pitcherResults"]["loss"]["name"] + " ({:s}-{:s})".format(game["pitcherResults"]["loss"]["updatedWins"], game["pitcherResults"]["loss"]["updatedLosses"]))
+
+                if("save" in game["pitcherResults"]):
+                    print("S: " + game["pitcherResults"]["save"]["name"] + " ({:s})".format(game["pitcherResults"]["save"]["updatedSaves"]))
+
+            print("")
+            inningString    = "         "
+            underlineString = "---------------------"
+
+            for i in range(1, max(10, len(game["away"]["scoreByInning"]) + 1)):
+                inningString += "{:2d}".format(i) + "   "
+                underlineString += "-----"
+
+            inningString += " R    H    E"
+
+            print(inningString)
+            print(underlineString)
+
+            if game["status"] == GameStatus.Live:
+                if game["inning"]["part"] in (InningPart.Top, InningPart.End):
+                    awayString = " * "
+                    homeString = "   "
+                else:
+                    awayString = "   "
+                    homeString = " * "
+            else:
+                awayString = "   "
+                homeString = "   "
+
+            awayString += game["away"]["name"] + (" " * (3 - len(game["away"]["name"])))
+            for inningScore in game["away"]["scoreByInning"]:
+                awayString += (" " * (5 - len(inningScore))) + inningScore
+
+            awayString += " |" + (" " * (3 - len(game["away"]["runs"]))) + game["away"]["runs"]
+            awayString += " |" + (" " * (3 - len(game["away"]["hits"]))) + game["away"]["hits"]
+            awayString += " |" + (" " * (3 - len(game["away"]["errors"]))) + game["away"]["errors"]
+
+            homeString += game["home"]["name"] + (" " * (3 - len(game["home"]["name"])))
+            for inningScore in game["home"]["scoreByInning"]:
+                homeString += (" " * (5 - len(inningScore))) + inningScore
+
+            homeString += " |" + (" " * (3 - len(game["home"]["runs"]))) + game["home"]["runs"]
+            homeString += " |" + (" " * (3 - len(game["home"]["hits"]))) + game["home"]["hits"]
+            homeString += " |" + (" " * (3 - len(game["home"]["errors"]))) + game["home"]["errors"]
+
+            print(awayString)
+            print(homeString)
+
+            if game["status"] == GameStatus.Live:
+                # Example situation output
+                #
+                # B: ***         o          P: Wacha
+                # S: *         *   *       AB: Cruz
+                # O: **          o            
+
+                numBalls = int(game["situation"]["balls"])
+                numStrikes = int(game["situation"]["strikes"])
+                numOuts = int(game["situation"]["outs"])
+                runners = game["situation"]["runners"]
+
+                string1 = "B: " + ("*" * numBalls) + (" " * (10 - numBalls))
+                string1 += "  "
+                string1 += ("o" if runners[1] == "" else "*")
+                string1 += "          P: " + game["situation"]["pitcher"]["name"] + " ({:s})".format(game["situation"]["pitcher"]["era"])
 
 
-    
+                string2 = "S: " + ("*" * numStrikes) + (" " * (10 - numStrikes))
+                string2 += ("o" if runners[2] == "" else "*")
+                string2 += "   "
+                string2 += ("o" if runners[0] == "" else "*")
+                string2 += "       AB: " + game["situation"]["batter"]["name"] + " ({:s})".format(game["situation"]["batter"]["avg"])
+
+                string3 = "O: " + ("*" * numOuts) + (" " * (10 - numOuts))
+                string3 += "  "
+                string3 += "o"
+
+                print("")
+                print(string1)
+                print(string2)
+                print(string3)
+                if "lastPlay" in game["situation"]:
+                   print("")
+                   print("Last Play: " + game["situation"]["lastPlay"])
+
+    time.sleep(20)
