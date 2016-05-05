@@ -1,9 +1,12 @@
 import sys
+import os
 import datetime
 
 from scrape.mlb_scraper import GameStatus, InningPart
 from scrape.mlb_scraper_mlb_api import MlbScraperMlbApi
 from scrape.mlb_scraper_cbs import MlbScraperCbs
+
+print(sys.path)
 
 mlb = MlbScraperMlbApi()
 
