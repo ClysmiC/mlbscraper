@@ -87,7 +87,7 @@ class MlbScraperMlbApi(BaseMlbScraper):
                 # status attribute.
                 if statusString in ("Warmup", "Preview"):
                     game["status"] = GameStatus.Pre
-                elif statusString == "In Progress":
+                elif statusString in ("In Progress", "Manager Challenge"):
                     game["status"] = GameStatus.Live
                 elif statusString in ("Final", "Game Over"):
                     game["status"] = GameStatus.Post
