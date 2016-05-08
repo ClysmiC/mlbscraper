@@ -114,23 +114,24 @@ class MlbScraperMlbApi(BaseMlbScraper):
                     game["situation"]["pitcher"] = {}
                     game["situation"]["batter"] = {}
 
-                    # Mlb leaves "dangling" data between innings
-                    # (Mid/End), such as the b/s/o count, and who is
-                    # batting/pitching, which doesn't get updated
-                    # until the next inning starts (is in the
-                    # Top/Bot). Between innings, I want b/s/o set to
-                    # 0, and I want the batter to be the "due up"
-                    # batter for the upcoming inning.
-                    if game["inning"]["part"] in (InningPart.Top, InningPart.Bot):
-                        # If you want first + last name, use a string like this:
-                        # gameData["pitcher"]["first"] + " " + gameData["pitcher"]["last"]
-                        
-                        game["situation"]["batter"]["name"] = gameData["batter"]["name_display_roster"]
-                        game["situation"]["batter"]["avg"] = gameData["batter"]["avg"]
-                        
-                        game["situation"]["pitcher"]["name"] = gameData["pitcher"]["name_display_roster"]
-                        game["situation"]["pitcher"]["era"] = gameData["pitcher"]["era"]
+                    # If you want first + last name, use a string like this:
+                    # gameData["pitcher"]["first"] + " " + gameData["pitcher"]["last"]
+                    game["situation"]["batter"]["name"] = gameData["batter"]["name_display_roster"]
+                    game["situation"]["batter"]["avg"] = gameData["batter"]["avg"]
 
+                    game["situation"]["pitcher"]["name"] = gameData["pitcher"]["name_display_roster"]
+                    game["situation"]["pitcher"]["era"] = gameData["pitcher"]["era"]
+
+                    if "pbp" in gameData and "last" in gameData["pbp"] and gameData["pbp"]["last"] != "":
+                        game["situation"]["lastPlay"] = gameData["pbp"]["last"]
+
+                    # Mlb leaves "dangling" data between innings
+                    # (Mid/End), such as the b/s/o, batter, pticher
+                    # until the next inning starts (is in the
+                    # Top/Bot). Between innings, I want b/s/o set to 0
+                    # and I want to peek ahead to the upcoming batter
+                    # and pitcher
+                    if game["inning"]["part"] in (InningPart.Top, InningPart.Bot):
                         game["situation"]["balls"]   = gameData["status"]["b"]
                         game["situation"]["strikes"] = gameData["status"]["s"]
                         game["situation"]["outs"]    = gameData["status"]["o"]
@@ -150,18 +151,16 @@ class MlbScraperMlbApi(BaseMlbScraper):
                         else:
                             game["situation"]["runners"].append("")
 
-                        if "pbp" in gameData and "last" in gameData["pbp"] and gameData["pbp"]["last"] != "":
-                            game["situation"]["lastPlay"] = gameData["pbp"]["last"]
 
                             
                     # Inning is in Mid/End, peek ahead and put that
                     # data as the situation
                     else:
-                        game["situation"]["batter"]["name"] = gameData["batter"]["name_display_roster"]
-                        game["situation"]["batter"]["avg"] = gameData["batter"]["avg"]
+                        game["situation"]["batter"]["name"] = gameData["due_up_batter"]["name_display_roster"]
+                        game["situation"]["batter"]["avg"] = gameData["due_up_batter"]["avg"]
                         
-                        game["situation"]["pitcher"]["name"] = gameData["pitcher"]["name_display_roster"]
-                        game["situation"]["pitcher"]["era"] = gameData["pitcher"]["era"]
+                        game["situation"]["pitcher"]["name"] = gameData["opposing_pitcher"]["name_display_roster"]
+                        game["situation"]["pitcher"]["era"] = gameData["opposing_pitcher"]["era"]
                         
                         game["situation"]["balls"]   = "0"
                         game["situation"]["strikes"] = "0"
@@ -245,7 +244,11 @@ class MlbScraperMlbApi(BaseMlbScraper):
                     # Pad unplayed innings with dashes
                     while len(awayScoreByInning) < 9:
                         awayScoreByInning.append("-")
-                    while len(homeScoreByInning) < 9:
+
+                    # In extras, this length may be > 9 but still less
+                    # than the number of innings the away team has
+                    # played, so check against that number as well.
+                    while len(homeScoreByInning) < 9 or len(homeScoreByInning) < len(awayScoreByInning):
                         homeScoreByInning.append("-")
                         
                     game["away"]["scoreByInning"] = awayScoreByInning
