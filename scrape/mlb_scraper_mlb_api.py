@@ -66,6 +66,8 @@ class MlbScraperMlbApi(BaseMlbScraper):
                 
 
                 if game["status"] == GameStatus.Pre:
+                    # TODO: use heuristics to decide whether this is
+                    # AM or PM, then format it in 24 hour clock
                     game["startTime"] = gameData["time"]
 
                     if gameData["away_probable_pitcher"]["name_display_roster"] != "":
