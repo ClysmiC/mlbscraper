@@ -63,24 +63,18 @@ class LiveScoreboard:
         
         # Store the time of when we last requested these things. This
         # is used to make our requests at a reasonable rate.
-        lastWeatherQueryTime = 0
+        weatherQueryMade = False         # (This hour)
         lastGameQueryTime = 0
         lastDivisionQueryTime = 0
 
-        weatherQueryCooldown      = 1800 # Once per half-hour
+        weatherQueryMinuteMark    = 40   # Query at XX:40
+        
         gameNonLiveQueryCooldown  = 900  # Once per 15 minutes
         gameLiveQueryCooldown     = 20   # Once per 20 seconds
         divisionQueryCooldown     = 900  # Once per 15 minutes
 
         gameState = GameStatus.NoGame
 
-        # NOTE:
-        # Weather to show:
-        # 12 times that fit the following criteria
-        # ALWAYS show first 3 hours in the list.
-
-        # Don't show odd hours (unless it is in first 3 hours)
-        # Don't show weather from 00:00 - 6:00 (unless it is in first 3 hours)
 
         movie = pg.movie.Movie('moving_background.mpg')
         movie_screen = pg.Surface(movie.get_size()).convert()
@@ -113,10 +107,15 @@ class LiveScoreboard:
             if firstLoop or now.second != previousTime.second:
                 timePanel.setTime(now)
                 timePanelSurface = timePanel.update()
+
+            # Weather query not yet made this hour... but wait for the
+            # minute mark to make it.
+            if now.minute <= weatherQueryMinuteMark:
+                weatherQueryMade = False
                 
             # Update weather panel
-            if firstLoop or executionTime >= lastWeatherQueryTime + weatherQueryCooldown:
-                lastWeatherQueryTime = executionTime
+            if firstLoop or (now.minute >= weatherQueryMinuteMark and not weatherQueryMade):
+                weatherQueryMade = True
                 weatherInfo = hourlyForecast("Saint Louis", "MO", wundergroundApiKey)
                 weatherInfoToDisplay = []
 
