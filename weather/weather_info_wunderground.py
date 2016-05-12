@@ -3,7 +3,7 @@ from urllib.request import urlopen
 import json
 import datetime
 
-target = "http://api.wunderground.com/api/[API]/hourly/q/[STATE]/[CITY].json"
+target = "http://api.wunderground.com/api/[API-KEY]/hourly/q/[STATE]/[CITY].json"
 
 def hourlyForecast(cityName, stateInitials, apiKey):
     '''Returns a list with the next 24 hours of weather information.
@@ -26,7 +26,7 @@ def hourlyForecast(cityName, stateInitials, apiKey):
 
 
     forecast = []
-    urlString = target.replace("[API]", apiKey).replace("[STATE]", stateInitials).replace("[CITY]", cityName).replace(" ", "_")
+    urlString = target.replace("[API-KEY]", apiKey).replace("[STATE]", stateInitials).replace("[CITY]", cityName).replace(" ", "_")
 
     try:
         jsonString = urlopen(urlString).read().decode("utf-8")
