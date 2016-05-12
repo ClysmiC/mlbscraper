@@ -1,6 +1,3 @@
-# TODO: switch to monospaced font to make everything less of a pain in
-# the ass?
-
 from scrape.mlb_scraper import GameStatus, InningPart
 from scrape.mlb_scraper_mlb_api import MlbScraperMlbApi
 from weather.weather_info_wunderground import hourlyForecast
@@ -16,20 +13,29 @@ daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 wundergroundApiKey = "6d48850a7f579fe7"
 
+
+fontName = "inputsansblack"
 fontColor = (0xBC, 0xBC, 0xBC)
+
+pg.init()
+displaySize = pg.display.Info()
+resolution = (displaySize.current_w, displaySize.current_h)
+screen = pg.display.set_mode(resolution, pg.FULLSCREEN)
+pg.mouse.set_visible(False)
+
 
 class LiveScoreboard:
     def __init__(self):
-        pg.init()
 
-        displaySize = pg.display.Info()
-        resolution = (displaySize.current_w, displaySize.current_h)
         FPS = 30
 
-        pg.init()
-        screen = pg.display.set_mode(resolution, pg.FULLSCREEN)
-        pg.mouse.set_visible(False)
-
+        # See what fonts are available
+        # fontlist = pg.font.get_fonts()
+        # fontlist.sort()
+        
+        # for font in fontlist:
+        #     print (font)
+        
         # Split the screen up into these virtual rows and columns. Use these
         # to determine where to position each element. This lets the elements
         # automatically resize on different sized monitors
@@ -161,22 +167,27 @@ class LiveScoreboard:
 
 
 class TimePanel:
-    # 10 % - gap
-    # 35 % - line 1 (date)
-    # 10 % - gap
-    # 35 % - line 2 (time)
-    # 10 % - gap
-
-    # NOTE: The math isn't pixel perfect, since we specify the FONT
-    # height, which isn't necessarily the line height. But it has
-    # looked good on every monitor that I've tried. If I find a
-    # monitor that it looks bad on, do an approach similar to the
-    # weather panel to find the biggest acceptable font size.
     def __init__(self, panelWidth, panelHeight):
         self.surface = pg.Surface((panelWidth, panelHeight), flags=pg.SRCALPHA)
         self.time = None
+
+        fontSize = 1
+        self.font = pg.font.SysFont(fontName, fontSize)
+
+        # Find largest font that takes up <80% of either horizontal or
+        # vertical space
+        while True:
+            fontSize += 1
+            biggerFont = pg.font.SysFont(fontName, fontSize)
+
+            if 2 * biggerFont.get_linesize() >= panelHeight * 0.8 or self.font.size("Thu, May 12")[0] >= panelWidth * 0.8:
+                break
+            
+            self.font = biggerFont
+
+        # Vertically center the 2 lines of text
+        self.lineYStart = (panelHeight - 2 * self.font.get_linesize()) // 2
         
-        self.font = pg.font.SysFont('franklingothicdemi', int(panelHeight * 0.35))
         self.background = (0, 0, 0, 120)
 
         # Font is not monospaced, so the updating time string changes
@@ -184,23 +195,27 @@ class TimePanel:
         # it move a bit each tick. Instead, we will treat each text
         # surface as if it had the width of the following surface, so
         # it will always be drawn in the same place.
-        self.timeTextWidth = self.font.render("00:00:00", True, fontColor).get_width()
+
+        # Note: not needed if using monospace font
+        # self.timeTextWidth = self.font.render("00:00:00", True, fontColor).get_width()
         
     def setTime(self, time):
         self.time = time
         
     def update(self):
         self.surface.fill(self.background)
-
         string1 = daysOfWeek[self.time.weekday()] + ", " + months[self.time.month] + " " + str(self.time.day)
         string2 = "{:02d}:{:02d}:{:02d}".format(self.time.hour, self.time.minute, self.time.second)
         
-        # 1st line of text
+        lineY = self.lineYStart
+        
         textSurface = self.font.render(string1, True, fontColor)
-        self.surface.blit(textSurface, ((self.surface.get_width() - textSurface.get_width()) // 2, int(self.surface.get_height() * 0.1)))
+        self.surface.blit(textSurface, ((self.surface.get_width() - textSurface.get_width()) // 2, lineY))
 
+        lineY += self.font.get_linesize()
+        
         textSurface = self.font.render(string2, True, fontColor)
-        self.surface.blit(textSurface, ((self.surface.get_width() - self.timeTextWidth) // 2, int(self.surface.get_height() * (0.1 + 0.35 + 0.1))))
+        self.surface.blit(textSurface, ((self.surface.get_width() - textSurface.get_width()) // 2, lineY))
         
         return self.surface
         
@@ -208,27 +223,50 @@ class TimePanel:
 
 
 class WeatherPanel:
-    # Each date label (should be no more than 2) has new line, and
-    # then a text line (2 units per label = 4 units total). Each
-    # weather line takes up a text line (1 unit per line = 12 units
-    # total).
+    # Each date label (should be no more than 2) has new line before
+    # it, and then a text line (2 units per label = 4 units
+    # total). Each weather line takes up a text line (1 unit per line
+    # = 12 units total). Add 1 new line to the end (1 unit).
 
-    # Grand total of 16 units, so text size is panel height * 1/16
+    # Grand total of 17 units, so text size is panel height * 1/17
     
     def __init__(self, panelWidth, panelHeight):
-        # TODO: add h and v padding. Some letters are being weird as
-        # hell, maybe try a new font ?
         self.surface = pg.Surface((panelWidth, panelHeight), flags=pg.SRCALPHA)
-
         fontSize = 1
-        self.font = pg.font.SysFont('franklingothicdemi', fontSize)
+        self.font = pg.font.SysFont(fontName, fontSize)
         
-        while 16 * self.font.get_linesize() < panelHeight:
+        while True:
             fontSize += 1
-            self.font = pg.font.SysFont('franklingothicdemi', fontSize)
+            biggerFont = pg.font.SysFont(fontName, fontSize)
+
+            if 18 * biggerFont.get_linesize() >= panelHeight:
+                break
+            
+            self.font = biggerFont
             
         self.background = (0, 0, 0, 120)
         self.weather = None
+
+        # Get width of example string w/ 3 digit temperature, and
+        # space alloted for weather icons.  This width will be used
+        # when centering text in panel.
+        stringWidth = self.font.size("00:00 - 100" + u'\N{DEGREE SIGN}' + " F        ")[0]
+        self.lineY = 0
+        self.lineX = (panelWidth - stringWidth) // 2
+        
+        self.iconX = self.lineX + self.font.size("00:00 - 100" + u'\N{DEGREE SIGN}' + " F    ")[0]
+        
+        # TODO: find places where it is raining, snowing, and has chance of
+        # rain, snow, so I know what the condition string is.
+        self.weatherIcons = {}
+        iconSize = self.font.get_height()
+
+        self.weatherIcons["Clear"] = pg.transform.smoothscale(pg.image.load("weather/icons/clear.png"), (iconSize, iconSize))
+        self.weatherIcons["Partly Cloudy"] = pg.transform.smoothscale(pg.image.load("weather/icons/partly_cloudy.png"), (iconSize, iconSize))
+        self.weatherIcons["Mostly Cloudy"] = self.weatherIcons["Partly Cloudy"]
+        self.weatherIcons["Overcast"] = pg.transform.smoothscale(pg.image.load("weather/icons/cloudy.png"), (iconSize, iconSize))
+        self.weatherIcons["Chance of a Thunderstorm"] = pg.transform.smoothscale(pg.image.load("weather/icons/chance_tstorm.png"), (iconSize, iconSize))
+        self.weatherIcons["Thunderstorm"] = pg.transform.smoothscale(pg.image.load("weather/icons/tstorm.png"), (iconSize, iconSize))
         
     def setWeather(self, weather):
         self.weather = weather
@@ -237,7 +275,7 @@ class WeatherPanel:
         self.surface.fill(self.background)
         
         lastDateLabelDay = None
-        lineY = 0
+        self.lineY = 0
         firstHour = True
         
         for hour in self.weather:
@@ -247,26 +285,29 @@ class WeatherPanel:
                 dayString = months[time.month] + " " + str(time.day)
                 daySurface = self.font.render(dayString, True, fontColor)
 
-                # New line
-                lineY += self.font.get_height()
-                self.surface.blit(daySurface, (0, lineY))
-                lineY += self.font.get_height()
+                # New lines
+                if lastDateLabelDay is not None:
+                    self.lineY += self.font.get_linesize()
+                    
+                self.lineY += self.font.get_linesize()
+                self.surface.blit(daySurface, (max(0, self.lineX - self.font.size("  ")[0]), self.lineY))
+                self.lineY += self.font.get_linesize()
 
                 self.font.set_underline(False)
                 lastDateLabelDay = time.day
 
-            hourString = "{:02d}:{:02d}".format(time.hour, time.minute) + " -- " + hour["temp"] + u'\N{DEGREE SIGN}' + " F -- " + hour["condition"]
+            hourString = "{:02d}:{:02d}".format(time.hour, time.minute) + " - " + "{:>3s}".format(hour["temp"]) + u'\N{DEGREE SIGN}' + " F"
 
             if firstHour:
                 hourSurface = self.font.render(hourString, True, (0, 0, 0), (255,255,153))
             else:
                 hourSurface = self.font.render(hourString, True, fontColor)
 
-            
-            self.surface.blit(hourSurface, (0, lineY))
-            lineY += self.font.get_height()
+            self.surface.blit(hourSurface, (self.lineX, self.lineY))
+            self.surface.blit(self.weatherIcons[hour["condition"]], (self.iconX, self.lineY))
+            self.lineY += self.font.get_linesize()
             firstHour = False
-            
+
         return self.surface
 
 
