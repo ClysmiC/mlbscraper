@@ -1,3 +1,5 @@
+# -*- coding: latin-1 -*-
+
 from scrape.mlb_scraper import GameStatus, InningPart
 from scrape.mlb_scraper_mlb_api import MlbScraperMlbApi
 from weather.weather_info_wunderground import hourlyForecast
@@ -337,7 +339,7 @@ class WeatherPanel:
         # Get width of example string w/ 3 digit temperature, and
         # space alloted for weather icons.  This width will be used
         # when centering text in panel.
-        exampleString = " 00:00 - 100" + u'\N{DEGREE SIGN}' + " F  "
+        exampleString = " 00:00 - 100" + '°' + " F  "
 
         # Extra spaces after example string to ensure icons fit
         self.font = fontFit(fontName, exampleString + "  ", (panelWidth * 0.8, panelHeight // numLines))           
@@ -389,7 +391,7 @@ class WeatherPanel:
                 self.font.set_underline(False)
                 lastDateLabelDay = time.day
 
-            hourString = " {:02d}:{:02d}".format(time.hour, time.minute) + " - " + "{:>3s}".format(hour["temp"]) + u'\N{DEGREE SIGN}' + " F "
+            hourString = " {:02d}:{:02d}".format(time.hour, time.minute) + " - " + "{:>3s}".format(hour["temp"]) + '°' + " F "
 
             if firstHour:
                 hourSurface = self.font.render(hourString, True, (0, 0, 0), (255,255,153))

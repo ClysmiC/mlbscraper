@@ -55,7 +55,7 @@ class MlbScraperMlbApi(BaseMlbScraper):
                 # TODO: check the api when there are rainouts or rain
                 # delays. I suspect that these are shown in this
                 # status attribute.
-                if statusString in ("Warmup", "Preview"):
+                if statusString in ("Pre-Game", "Warmup", "Preview"):
                     game["status"] = GameStatus.Pre
                 elif statusString in ("In Progress", "Manager Challenge"):
                     game["status"] = GameStatus.Live
