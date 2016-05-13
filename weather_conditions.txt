@@ -1,5 +1,6 @@
-Clear
-Partly Cloudy
-Mostly Cloudy
-Chance of a Thunderstorm
-Overcast
+Clear - http://icons.wxug.com/i/c/k/clear.gif
+Partly Cloudy - http://icons.wxug.com/i/c/k/mostlycloudy.gif
+Mostly Cloudy - http://icons.wxug.com/i/c/k/mostlycloudy.gif
+Overcast - http://icons.wxug.com/i/c/k/cloudy.gif
+Chance of a Thunderstorm - http://icons.wxug.com/i/c/k/chancetstorms.gif
+Thunderstorm - http://icons.wxug.com/i/c/k/tstorms.gif

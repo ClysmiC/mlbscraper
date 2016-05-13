@@ -66,9 +66,18 @@ class MlbScraperMlbApi(BaseMlbScraper):
                 
 
                 if game["status"] == GameStatus.Pre:
-                    # TODO: use heuristics to decide whether this is
-                    # AM or PM, then format it in 24 hour clock
-                    game["startTime"] = gameData["time"]
+                    game["startTime"] = {}
+                    rawHomeTime = gameData["home_time"]
+                    hour, minute = rawHomeTime.split(":")
+                    hour = int(hour)
+                    minute = int(minute)
+                    
+                    # Convert to 24 hour time
+                    if hour < 10:
+                        hour += 12
+                        
+                    game["startTime"]["time"] = datetime.datetime(date.year, date.month, date.day, hour, minute)
+                    game["startTime"]["timeZone"] = gameData["home_time_zone"]
 
                     if gameData["away_probable_pitcher"]["name_display_roster"] != "":
                         game["away"]["starter"] = {}
@@ -215,9 +224,9 @@ class MlbScraperMlbApi(BaseMlbScraper):
                     # linescore->inning is an array, with each entry
                     # describing an inning. Dumb... but I need to work
                     # around it.
-                    if type(gameData["linescore"]["inning"] is list):
+                    if type(gameData["linescore"]["inning"]) is list:
                         inningArray = gameData["linescore"]["inning"]
-                    elif type(gameData["linescore"]["inning"] is dict):
+                    elif type(gameData["linescore"]["inning"]) is dict:
                         inningArray = []
                         inningArray.append(gameData["linescore"]["inning"])
                     else:

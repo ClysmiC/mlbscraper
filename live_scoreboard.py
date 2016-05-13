@@ -6,6 +6,22 @@ from datetime import datetime, timedelta
 import time
 import pygame as pg
 
+# Eastern Time
+# RASPBERRY_PI_TIMEZONE = "ET"
+
+# Central Time
+RASPBERRY_PI_TIMEZONE = "CT"
+
+# Mountain Time
+# RASPBERRY_PI_TIMEZONE = "MST"
+
+# Pacific Time
+# RASPBERRY_PI_TIMEZONE = "PT"
+
+TEAM_OF_INTEREST = "STL"
+
+timezones = ["PT", "MST", "CT", "ET"]
+
 months = ["NONE", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 # 0 = Monday for some reason in datetime module
@@ -92,11 +108,23 @@ class LiveScoreboard:
         gamePreviewPanelY1 = gameScorePanelY1
         gamePreviewPanelX2 = gameScorePanelX2
         gamePreviewPanelY2 = gameScorePanelY2
+
+        boxScorePanelX1 = columns[10]
+        boxScorePanelY1 = rows[7] 
+        boxScorePanelX2 = columns[29]
+        boxScorePanelY2 = rows[13]
+        
+        firstPitchCountdownPanelX1 = boxScorePanelX1
+        firstPitchCountdownPanelY1 = boxScorePanelY1
+        firstPitchCountdownPanelX2 = boxScorePanelX2
+        firstPitchCountdownPanelY2 = boxScorePanelY2
         
         timePanel = TimePanel(timePanelX2 - timePanelX1, timePanelY2 - timePanelY1)
         weatherPanel = WeatherPanel(weatherPanelX2 - weatherPanelX1, weatherPanelY2 - weatherPanelY1)
         gameScorePanel = GameScorePanel(gameScorePanelX2 - gameScorePanelX1, gameScorePanelY2 - gameScorePanelY1)
         gamePreviewPanel = GamePreviewPanel(gamePreviewPanelX2 - gamePreviewPanelX1, gamePreviewPanelY2 - gamePreviewPanelY1)
+        boxScorePanel = BoxScorePanel(boxScorePanelX2 - boxScorePanelX1, boxScorePanelY2 - boxScorePanelY1)
+        firstPitchCountdownPanel = FirstPitchCountdownPanel(firstPitchCountdownPanelX2 - firstPitchCountdownPanelX1, firstPitchCountdownPanelY2 - firstPitchCountdownPanelY1)
         
         # Store the time of when we last requested these things. This
         # is used to make our requests at a reasonable rate.
@@ -105,11 +133,14 @@ class LiveScoreboard:
         lastDivisionQueryTime = 0
 
         weatherQueryMinuteMark    = 40   # Query at XX:40
-        
-        gameNonLiveQueryCooldown  = 900  # Once per 15 minutes
-        gameLiveQueryCooldown     = 20   # Once per 20 seconds
-        divisionQueryCooldown     = 900  # Once per 15 minutes
 
+        # Add a few seconds to some of the cooldowns to try to prevent
+        # all the queries from happening in the same second and
+        # lowering the framerate (since queries are synchronous)
+        gameNonLiveQueryCooldown    = 302  # Once per 5 minutes
+        gameAlmostLiveQueryCooldown = 60   # Once per minute
+        gameLiveQueryCooldown       = 20   # Once per 20 seconds
+        divisionQueryCooldown       = 907  # Once per 15 minutes
         
         movie = pg.movie.Movie('moving_background.mpg')
         movie_screen = pg.Surface(movie.get_size()).convert()
@@ -140,14 +171,25 @@ class LiveScoreboard:
 
 
             # Query game information
+            gameAlmostStarted = False
+
+            if not firstLoop and game["status"] == GameStatus.Pre:
+                timeUntilGame = game["adjustedDateTime"] - datetime.now()
+                if timeUntilGame.total_seconds() < gameNonLiveQueryCooldown:
+                    gameAlmostStarted = True
+                    
             if (firstLoop) or (game["status"] == GameStatus.Live and executionTime - lastGameQueryTime >= gameLiveQueryCooldown) or (
+                    gameAlmostStarted and executionTime - lastGameQueryTime >= gameAlmostLiveQueryCooldown) or (
                     executionTime - lastGameQueryTime >= gameNonLiveQueryCooldown):
+
+                # Don't update to todays game until 4am. If it is
+                # before 4am, show yesterday's game
                 if now.hour < 4:
                     dateOfInterest = now - timedelta(days=1)
                 else:
                     dateOfInterest = now
                     
-                game = mlb.getGameInfo("STL", dateOfInterest)
+                game = mlb.getGameInfo(TEAM_OF_INTEREST, dateOfInterest)
 
                 # If no game found for today, look ahead up to 10 days
                 # until we find a game
@@ -155,21 +197,35 @@ class LiveScoreboard:
                 while game["status"] == GameStatus.NoGame and lookaheadDays < 10:
                     lookaheadDays += 1
                     dateOfInterest = dateOfInterest + timedelta(days=1)
-                    game = mlb.getGameInfo("STL", dateOfInterest)
+                    game = mlb.getGameInfo(TEAM_OF_INTEREST, dateOfInterest)
 
+                # Adjust game time to the current timezone
+                if game["status"] == GameStatus.Pre:
+                    rawDateTime = game["startTime"]["time"]
+                    hoursToAdjust = timezones.index(RASPBERRY_PI_TIMEZONE) - timezones.index(game["startTime"]["timeZone"])
+                    adjustedDateTime = rawDateTime + timedelta(hours=hoursToAdjust)
+                    game["adjustedDateTime"] = adjustedDateTime
+                    firstPitchCountdownPanel.setTargetTime(adjustedDateTime)
+                    
                 if game["status"] in (GameStatus.Live, GameStatus.Post):
                     gameScorePanel.setScore(game)
                     gameScoreOrPreviewPanelSurface = gameScorePanel.update()
+                    boxScoreOrCountdownSurface = boxScorePanel.update()
                 else:
                     gamePreviewPanel.setPreview(game)
                     gameScoreOrPreviewPanelSurface = gamePreviewPanel.update()
+                    boxScoreOrCountdownSurface = firstPitchCountdownPanel.update()
                     
                 lastGameQueryTime = executionTime
                     
-            # Update day/time panel
+            # Update day/time panel, as well as first pitch countdown
+            # panel once per second
             if firstLoop or now.second != previousTime.second:
                 timePanel.setTime(now)
                 timePanelSurface = timePanel.update()
+
+                if game["status"] == GameStatus.Pre:
+                    boxScoreOrCountdownSurface = firstPitchCountdownPanel.update()
 
             # Weather query not yet made this hour... but wait for the
             # minute mark to make it.
@@ -198,7 +254,7 @@ class LiveScoreboard:
                         
                 weatherPanel.setWeather(weatherInfoToDisplay)
                 weatherPanelSurface = weatherPanel.update()
-            
+                
             # Stretch video to fit display. Transfer the stretched video onto
             # the screen.
             pg.transform.scale(movie_screen, screen.get_size(), screen)
@@ -207,6 +263,7 @@ class LiveScoreboard:
             screen.blit(timePanelSurface, (timePanelX1, timePanelY1))
             screen.blit(weatherPanelSurface, (weatherPanelX1, weatherPanelY1))
             screen.blit(gameScoreOrPreviewPanelSurface, (gameScorePanelX1, gameScorePanelY1))
+            screen.blit(boxScoreOrCountdownSurface, (firstPitchCountdownPanelX1, firstPitchCountdownPanelY1))
             pg.display.update()
             
             # Check for quit event or ESC key press
@@ -280,7 +337,7 @@ class WeatherPanel:
         # Get width of example string w/ 3 digit temperature, and
         # space alloted for weather icons.  This width will be used
         # when centering text in panel.
-        exampleString = "00:00 - 100" + u'\N{DEGREE SIGN}' + " F  "
+        exampleString = " 00:00 - 100" + u'\N{DEGREE SIGN}' + " F  "
 
         # Extra spaces after example string to ensure icons fit
         self.font = fontFit(fontName, exampleString + "  ", (panelWidth * 0.8, panelHeight // numLines))           
@@ -332,7 +389,7 @@ class WeatherPanel:
                 self.font.set_underline(False)
                 lastDateLabelDay = time.day
 
-            hourString = "{:02d}:{:02d}".format(time.hour, time.minute) + " - " + "{:>3s}".format(hour["temp"]) + u'\N{DEGREE SIGN}' + " F"
+            hourString = " {:02d}:{:02d}".format(time.hour, time.minute) + " - " + "{:>3s}".format(hour["temp"]) + u'\N{DEGREE SIGN}' + " F "
 
             if firstHour:
                 hourSurface = self.font.render(hourString, True, (0, 0, 0), (255,255,153))
@@ -382,19 +439,14 @@ class GameScorePanel():
 
     def update(self):
         self.surface.fill(panelBackgroundColor)
-
-        # TEMP HACK CODE
-        self.game["home"]["name"] = "SF"
-        self.game["away"]["runs"] = 15
-        self.game["home"]["runs"] = 3
         
-        awayString   = " " * self.numLeadingSpacesForLogo + self.game["away"]["name"] + " {:2d}".format(self.game["away"]["runs"])
+        awayString   = " " * self.numLeadingSpacesForLogo + self.game["away"]["name"] + " {:2s}".format(self.game["away"]["runs"])
         awayLogo = self.scaledLogos[self.game["away"]["name"]]
 
-        homeString   = " " * self.numLeadingSpacesForLogo + self.game["home"]["name"] + " {:2d}".format(self.game["home"]["runs"])
+        homeString   = " " * self.numLeadingSpacesForLogo + self.game["home"]["name"] + " {:2s}".format(self.game["home"]["runs"])
         homeLogo = self.scaledLogos[self.game["home"]["name"]]
 
-        inningString = "Top  3"
+        inningString = self.game["inning"]["part"].name + " " + self.game["inning"]["number"]
 
         lineY = self.lineYStart
 
@@ -403,7 +455,7 @@ class GameScorePanel():
         awayLogoOffset = (logoSpaceWidth - awayLogo.get_width()) // 2
         homeLogoOffset = (logoSpaceWidth - homeLogo.get_width()) // 2
         
-        self.surface.blit(awayLogo, (self.leftHalfX + awayLogoOffset, lineY + self.font.get_linesize() * 0.5 * (1 * self.logoLinePortion)))
+        self.surface.blit(awayLogo, (self.leftHalfX + awayLogoOffset, lineY + self.font.get_linesize() * 0.5 * (1 - self.logoLinePortion)))
         self.surface.blit(self.font.render(awayString, True, fontColor), (self.leftHalfX, lineY))
         self.surface.blit(self.font.render(inningString, True, fontColor), (self.rightHalfX, lineY))
 
@@ -419,10 +471,9 @@ class GamePreviewPanel:
         self.surface = pg.Surface((panelWidth, panelHeight), flags=pg.SRCALPHA)
 
         # Leading spaces leave room for logo
-        self.numLeadingSpacesForLogo = 4
-        exampleTopString = " " * self.numLeadingSpacesForLogo +  "CHC @ STL" + " " * self.numLeadingSpacesForLogo
+        exampleTopString = "CHC @ STL"
         exampleBotString = "May 12, 15:28"
-        self.font = fontFit(fontName, exampleTopString, (panelWidth * .8, panelHeight * 0.8 / 2))
+        self.font = fontFit(fontName, exampleBotString, (panelWidth * .5, panelHeight * 0.8 / 2))
 
         # Center 2 lines of text vertically
         self.lineYStart = (panelHeight - 2 * self.font.get_linesize()) // 2
@@ -434,13 +485,16 @@ class GamePreviewPanel:
         self.botX = (panelWidth - self.font.size(exampleBotString)[0]) // 2
         
         self.scaledLogos = {}
-        self.logoLinePortion = 0.9
+
+        self.awayLogoRegion = pg.Rect(0, 0, panelWidth * .25, panelHeight)
+        self.homeLogoRegion = pg.Rect(panelWidth * .75, 0, panelWidth * .25, panelHeight)
         
         # Initialize list of MLB team logos
         for key, logo in mlbLogos.items():
             logoHeight = logo.get_height()
             logoWidth = logo.get_width()
-            scale = self.font.get_linesize() * self.logoLinePortion / logoHeight
+            scale = min(self.awayLogoRegion.height * 0.8 / logoHeight,
+                        self.awayLogoRegion.width * 0.8 / logoWidth)
 
             self.scaledLogos[key] = pg.transform.smoothscale(logo, (int(scale * logoWidth), int(scale * logoHeight)))
             
@@ -452,22 +506,27 @@ class GamePreviewPanel:
         self.surface.fill(panelBackgroundColor)
 
         if self.game["status"] == GameStatus.Pre:
-            topString   = " " * self.numLeadingSpacesForLogo + "{:3s} @ {:3s}".format(self.game["away"]["name"], self.game["home"]["name"]) + " " * self.numLeadingSpacesForLogo
-            botString = self.game["startTime"]
+            topString = "{:3s} @ {:3s}".format(self.game["away"]["name"], self.game["home"]["name"])
+
+            adt = self.game["adjustedDateTime"]
+            
+            botString = "{:s} {:d}, {:02d}:{:02d}".format(months[adt.month], adt.day, adt.hour, adt.minute)
 
             awayLogo = self.scaledLogos[self.game["away"]["name"]]
             homeLogo = self.scaledLogos[self.game["home"]["name"]]
 
-            logoSpace = " " * self.numLeadingSpacesForLogo
-            logoWidth = self.font.size(logoSpace)[0]
-
-            awayLogoOffset = (logoWidth - awayLogo.get_width()) // 2
-            homeLogoOffset = self.font.size(topString)[0] - logoWidth + (logoWidth - homeLogo.get_width()) // 2
+            # Center logo
+            awayLogoXOffset = (self.awayLogoRegion.width - awayLogo.get_width()) // 2
+            awayLogoYOffset = (self.awayLogoRegion.height - awayLogo.get_height()) // 2
+            
+            homeLogoXOffset = (self.homeLogoRegion.width - homeLogo.get_width()) // 2
+            homeLogoYOffset = (self.homeLogoRegion.height - homeLogo.get_height()) // 2
 
             lineY = self.lineYStart
 
-            self.surface.blit(awayLogo, (self.topX + awayLogoOffset, lineY + self.font.get_linesize() * 0.5 * (1 - self.logoLinePortion)))
-            self.surface.blit(homeLogo, (self.topX + homeLogoOffset, lineY + self.font.get_linesize() * 0.5 * (1 - self.logoLinePortion)))
+            self.surface.blit(awayLogo, (self.awayLogoRegion.left + awayLogoXOffset, self.awayLogoRegion.top + awayLogoYOffset))
+            self.surface.blit(homeLogo, (self.homeLogoRegion.left + homeLogoXOffset, self.homeLogoRegion.top + homeLogoYOffset))
+            
             self.surface.blit(self.font.render(topString, True, fontColor), (self.topX, lineY))
 
             lineY += self.font.get_linesize()
@@ -477,9 +536,58 @@ class GamePreviewPanel:
             self.surface.blit(self.font.render("No games found...", True, fontColor), (0, 0))
             
         return self.surface
+
+class BoxScorePanel:
+    def __init__(self, panelWidth, panelHeight):
+        self.surface = pg.Surface((panelWidth, panelHeight), flags=pg.SRCALPHA)
+
+
+    def setGame(self, game):
+        self.game = game
+
+    def update(self):
+        self.surface.fill(panelBackgroundColor)
+        return self.surface
+    
+class FirstPitchCountdownPanel:
+    def __init__(self, panelWidth, panelHeight):
+        self.surface = pg.Surface((panelWidth, panelHeight), flags=pg.SRCALPHA)
+
+        # Leading spaces leave room for logo
+        self.topString   = "First pitch in..."
+        exampleBotString = "0:00:00:00"
+        
+        self.font = fontFit(fontName, self.topString, (panelWidth * .7, panelHeight * 0.8 / 2))
+
+        self.lineYStart = (panelHeight - 2 * self.font.get_linesize()) // 2
+        self.topX = (panelWidth - self.font.size(self.topString)[0]) // 2
+        self.botX = (panelWidth - self.font.size(exampleBotString)[0]) // 2
+
+    def setTargetTime(self, targetTime):
+        self.targetTime = targetTime
+
+    def update(self):
+        self.surface.fill(panelBackgroundColor)
+        
+        lineY = self.lineYStart
+        now = datetime.now()
+        difference = self.targetTime - now
+
+        days = difference.days
+        hours = difference.seconds // 3600
+        mins = (difference.seconds % 3600) // 60
+        seconds = (difference.seconds % 3600 % 60) + 1 # Add 1 to "round up" the milliseconds, to make the clock + this time equal start time
+
+        botString = "{:d}:{:02d}:{:02d}:{:02d}".format(days, hours, mins, seconds)
+        
+        self.surface.blit(self.font.render(self.topString, True, fontColor), (self.topX, lineY))
+        lineY += self.font.get_linesize()
+        self.surface.blit(self.font.render(botString, True, fontColor), (self.botX, lineY))
+
+        return self.surface
     
 #
-#
+# Instantiate and run the LiveScoreboard
 #
 #
 #
